@@ -1,0 +1,52 @@
+.price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+  transition: background-color 0.1s ease;
+  user-select: none;
+}
+
+.price-row:hover {
+  background: var(--bg-surface);
+}
+
+.price-row.selected {
+  background: var(--accent-light);
+}
+
+.item-symbol {
+  display: flex;
+  align-items: baseline;
+  gap: 1px;
+}
+
+.coin {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+.pair {
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 400;
+}
+
+.item-price {
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.2s ease;
+}
+
+.flash-up-text {
+  color: var(--success);
+}
+
+.flash-down-text {
+  color: var(--error);
+}
