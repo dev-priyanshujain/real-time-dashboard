@@ -30,15 +30,25 @@ async function fetchTop100Symbols() {
       // Fallback to Binance volume if CoinGecko fails
       const res = await fetch('https://api.binance.com/api/v3/ticker/24hr');
       const data = await res.json();
-      marketCapSymbols = data
-        .filter(t => t.symbol.endsWith('USDT'))
-        .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
-        .map(t => t.symbol);
+      
+      if (Array.isArray(data)) {
+        marketCapSymbols = data
+          .filter(t => t.symbol.endsWith('USDT'))
+          .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
+          .map(t => t.symbol);
+      } else {
+        throw new Error('Binance 24h ticker response was not an array');
+      }
     }
 
     // 2. Fetch valid Binance pairs to ensure the coin has an active USDT pair
     const binanceRes = await fetch('https://api.binance.com/api/v3/exchangeInfo');
     const binanceData = await binanceRes.json();
+    
+    if (!binanceData.symbols) {
+      throw new Error('Binance exchangeInfo response missing symbols');
+    }
+
     const validBinancePairs = new Set(
       binanceData.symbols.filter(s => s.status === 'TRADING').map(s => s.symbol)
     );
