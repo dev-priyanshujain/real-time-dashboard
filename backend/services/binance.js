@@ -67,8 +67,23 @@ async function fetchTop100Symbols() {
 
     console.log(`Tracking top ${top100Symbols.size} USDT symbols by Market Cap.`);
   } catch (err) {
-    console.error('Error fetching coin lists, fallback to defaults.', err);
-    top100Symbols = new Set(['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT']);
+    console.error('Error fetching coin lists, fallback to hardcoded top 100.', err.message);
+    const defaults = [
+      'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT', 'AVAXUSDT', 'DOGEUSDT', 'DOTUSDT', 'TRXUSDT',
+      'LINKUSDT', 'MATICUSDT', 'ICPUSDT', 'SHIBUSDT', 'BCHUSDT', 'LTCUSDT', 'NEARUSDT', 'UNIUSDT', 'APTUSDT', 'FILUSDT',
+      'STXUSDT', 'OPUSDT', 'ATOMUSDT', 'ARBUSDT', 'IMXUSDT', 'VETUSDT', 'ETCUSDT', 'RNDRUSDT', 'TIAUSDT', 'LDOUSDT',
+      'SUIUSDT', 'KASUSDT', 'HBARUSDT', 'CROUSDT', 'GRTUSDT', 'SEIUSDT', 'INJUSDT', 'THETAUSDT', 'BEAMUSDT', 'RUNEUSDT',
+      'FTMUSDT', 'ALGOUSDT', 'EGLDUSDT', 'ARUSDT', 'FLOWUSDT', 'SANDUSDT', 'AAVEUSDT', 'QNTUSDT', 'SNXUSDT', 'MANTRAUSDT',
+      'GALAUSDT', 'CHZUSDT', 'AXSUSDT', 'MANAUSDT', 'EOSUSDT', 'MINAUSDT', 'NEOUSDT', 'JUPUSDT', 'DYDXUSDT', 'KAVAUSDT',
+      'RONUSDT', 'CAKEUSDT', 'LRCUSDT', 'XLMUSDT', 'ZILUSDT', 'IOTAUSDT', 'TFUELUSDT', 'GLMRUSDT', 'ROSEUSDT', 'FLOKIUSDT',
+      'APEUSDT', 'ENJUSDT', 'ONEUSDT', 'CRVUSDT', 'GMXUSDT', 'HOTUSDT', 'PEPEUSDT', 'WLDUSDT', 'LUNCUSDT', 'BTTUSDT',
+      'ANKRUSDT', 'WAVESUSDT', 'ZECUSDT', 'WOOUSDT', 'GMTUSDT', 'MASKUSDT', 'ORDIUSDT', 'CELOUSDT', 'BALUSDT', 'JSTUSDT',
+      'KNCUSDT', 'PENDLEUSDT', 'METISUSDT', 'GLMUSDT', 'PAXGUSDT', 'COMPUSDT', 'YFIUSDT', 'SUSHIUSDT', 'ONTUSDT', 'SKLUSDT'
+    ];
+    top100Symbols = new Set(defaults);
+    defaults.forEach(sym => {
+      latestPrices[sym] = { symbol: sym, price: null, timestamp: new Date() };
+    });
   }
 }
 

@@ -4,7 +4,7 @@ services:
     name: ledger-backend
     runtime: node
     plan: free
-    region: frankfurt
+    region: singapore
     rootDir: backend
     buildCommand: npm install
     startCommand: node server.js
