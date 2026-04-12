@@ -24,16 +24,45 @@ ChartJS.register(
   Filler
 );
 
+const RANGES = [
+  { key: '1h', label: '1H' },
+  { key: '6h', label: '6H' },
+  { key: '1d', label: '1D' },
+  { key: '7d', label: '7D' },
+  { key: '30d', label: '30D' },
+];
+
+const MAX_LIVE_POINTS = 60;
+
+const formatTickLabel = (timestamp, range) => {
+  const d = new Date(timestamp);
+  switch (range) {
+    case '1h':
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    case '6h':
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    case '1d':
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    case '7d':
+      return d.toLocaleDateString([], { weekday: 'short', hour: '2-digit' });
+    case '30d':
+      return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    default:
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+};
+
 const ChartComponent = ({ symbol, livePrice }) => {
   const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState('1d');
 
   useEffect(() => {
     const fetchHistory = async () => {
       setLoading(true);
       try {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-        const res = await fetch(`${apiUrl}/history?symbol=${symbol}&limit=60`);
+        const res = await fetch(`${apiUrl}/history?symbol=${symbol}&range=${range}`);
         const data = await res.json();
         setHistoryData(data);
       } catch (err) {
@@ -43,19 +72,22 @@ const ChartComponent = ({ symbol, livePrice }) => {
       }
     };
     fetchHistory();
-  }, [symbol]);
+  }, [symbol, range]);
 
   const displayData = Array.isArray(historyData) ? [...historyData] : [];
   if (livePrice && livePrice.price !== null && displayData.length > 0) {
      const lastData = displayData[displayData.length - 1];
      if (new Date(livePrice.timestamp) > new Date(lastData.timestamp)) {
          displayData.push({ price: livePrice.price, timestamp: livePrice.timestamp });
-         if (displayData.length > 60) displayData.shift();
+         if (displayData.length > MAX_LIVE_POINTS) {
+           const cutoff = displayData.length - MAX_LIVE_POINTS;
+           displayData.splice(0, cutoff);
+         }
      }
   }
 
   const chartData = {
-    labels: displayData.map(d => new Date(d.timestamp).toLocaleTimeString()),
+    labels: displayData.map(d => formatTickLabel(d.timestamp, range)),
     datasets: [
       {
         label: `${symbol.replace('USDT', '')} Price`,
@@ -128,6 +160,17 @@ const ChartComponent = ({ symbol, livePrice }) => {
     <div className="chart-container">
       <div className="chart-header">
         <h2 className="chart-title">{symbol.replace('USDT', '')} / USDT</h2>
+        <div className="range-selector">
+          {RANGES.map(r => (
+            <button
+              key={r.key}
+              className={`range-btn ${range === r.key ? 'active' : ''}`}
+              onClick={() => setRange(r.key)}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="chart-wrapper">
         {loading ? (
