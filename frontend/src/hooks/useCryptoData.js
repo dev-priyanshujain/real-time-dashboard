@@ -10,9 +10,13 @@ export function useCryptoData() {
     let active = true;
 
     const connect = () => {
-      // Don't open a second socket if one is already live
-      if (wsRef.current && wsRef.current.readyState <= WebSocket.OPEN) {
-        return;
+      if (wsRef.current) {
+        if (wsRef.current.readyState === WebSocket.OPEN) {
+          return;
+        }
+        if (wsRef.current.readyState === WebSocket.CONNECTING) {
+          return;
+        }
       }
 
       const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:5000';

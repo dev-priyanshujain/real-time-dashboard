@@ -5,8 +5,10 @@ const EventEmitter = require('events');
 const priceEvents = new EventEmitter();
 
 let latestPrices = {};
-let chunkUpdates = {}; // Only broadcast what changed
+let chunkUpdates = {};
+let pendingInserts = [];
 let lastEmit = 0;
+let lastInsertTime = 0;
 let top100Symbols = new Set();
 let binanceWs;
 
@@ -92,6 +94,8 @@ async function connectBinanceWS() {
     await fetchTop100Symbols();
   }
 
+  setInterval(fetchTop100Symbols, 24 * 60 * 60 * 1000);
+
   binanceWs = new WebSocket(BINANCE_WS_URL);
 
   binanceWs.on('open', () => {
@@ -113,7 +117,8 @@ async function connectBinanceWS() {
               timestamp: new Date()
             };
             latestPrices[symbol] = newEntry;
-            chunkUpdates[symbol] = newEntry; // Track this delta
+            chunkUpdates[symbol] = newEntry;
+            pendingInserts.push({ ...newEntry });
             updated = true;
           }
         });
@@ -144,18 +149,17 @@ async function connectBinanceWS() {
   });
 }
 
-// DB batch insert
+// DB batch insert — drains pendingInserts accumulated since last save
 setInterval(async () => {
-  // Only attempt to save prices that have actually received real data (price not null)
-  const pricesToSave = Object.values(latestPrices).filter(p => p.price !== null);
-  if (pricesToSave.length === 0) return;
+  if (pendingInserts.length === 0) return;
+  const batch = pendingInserts.splice(0);
 
   try {
     const values = [];
     const queryParams = [];
     let counter = 1;
 
-    for (const p of pricesToSave) {
+    for (const p of batch) {
       values.push(`($${counter}, $${counter + 1}, $${counter + 2})`);
       queryParams.push(p.symbol, p.price, p.timestamp);
       counter += 3;
@@ -169,6 +173,7 @@ setInterval(async () => {
     await query(insertQuery, queryParams);
   } catch (err) {
     console.error('Error in batch insert:', err);
+    pendingInserts.unshift(...batch);
   }
 }, 5000);
 

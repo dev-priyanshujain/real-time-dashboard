@@ -3,7 +3,7 @@ const cors = require('cors');
 const http = require('http');
 require('dotenv').config();
 
-const { initDB } = require('./db/index');
+const { initDB, startCleanupJob } = require('./db/index');
 const { connectBinanceWS } = require('./services/binance');
 const { setupWebSocketServer } = require('./websocket/server');
 const historyRoutes = require('./routes/history');
@@ -25,18 +25,19 @@ const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 
 async function startServer() {
-  // Initialize DB tables
-  await initDB();
-  
-  // Start consuming Binance feed
-  connectBinanceWS();
+  try {
+    await initDB();
+    startCleanupJob();
+    connectBinanceWS();
+    setupWebSocketServer(server);
 
-  // Attach WebSocket server
-  setupWebSocketServer(server);
-
-  server.listen(PORT, () => {
-    console.log(`Backend server running on port ${PORT}`);
-  });
+    server.listen(PORT, () => {
+      console.log(`Backend server running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+  }
 }
 
 startServer();

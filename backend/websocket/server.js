@@ -7,7 +7,6 @@ function setupWebSocketServer(server) {
   wss.on('connection', (ws) => {
     console.log('Client connected');
     
-    // Send initial state safely
     try {
       ws.send(JSON.stringify({ type: 'init', data: getLatestPrices() }));
     } catch (err) {
@@ -27,12 +26,20 @@ function setupWebSocketServer(server) {
 
     priceEvents.on('price_update', sendUpdate);
 
-    ws.on('error', () => {
-      // Swallow per-socket errors — close handler cleans up
+    let cleanedUp = false;
+    const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      priceEvents.off('price_update', sendUpdate);
+    };
+
+    ws.on('error', (err) => {
+      console.error('WebSocket client error:', err.message);
+      cleanup();
     });
 
     ws.on('close', (code) => {
-      priceEvents.off('price_update', sendUpdate);
+      cleanup();
       if (code !== 1000 && code !== 1001) {
         console.warn(`Client disconnected abnormally (code ${code})`);
       }
