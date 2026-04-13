@@ -15,6 +15,10 @@ import { Chart } from 'react-chartjs-2';
 import { useAnalyticsData } from "../hooks/useAnalyticsData";
 import './ChartComponent.css';
 
+
+
+
+
 ChartJS.register(
   CategoryScale,
   LinearScale,
