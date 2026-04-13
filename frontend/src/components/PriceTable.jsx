@@ -14,7 +14,12 @@ const PriceTable = ({ prices, selectedSymbol, onSelectSymbol }) => {
       filtered = allSymbols.filter(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
     }
     
-    return filtered.sort();
+    return filtered.sort((a, b) => {
+      const volA = parseFloat(prices[a]?.volume) || 0;
+      const volB = parseFloat(prices[b]?.volume) || 0;
+      if (volA !== volB) return volB - volA;
+      return a.localeCompare(b);
+    });
   }, [prices, searchTerm]);
 
   return (

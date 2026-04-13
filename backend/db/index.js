@@ -9,16 +9,16 @@ const pool = new Pool({
 });
 
 async function initDB() {
-  const queries = `
-    CREATE TABLE IF NOT EXISTS prices (
+  const queries = [
+    `CREATE TABLE IF NOT EXISTS prices (
       id SERIAL PRIMARY KEY,
       symbol VARCHAR(20) NOT NULL,
       price NUMERIC NOT NULL,
+      volume NUMERIC,
       timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE INDEX IF NOT EXISTS idx_prices_symbol_time ON prices(symbol, timestamp DESC);
-
-    CREATE TABLE IF NOT EXISTS summary_prices (
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_prices_symbol_time ON prices(symbol, timestamp DESC)`,
+    `CREATE TABLE IF NOT EXISTS summary_prices (
       id SERIAL PRIMARY KEY,
       symbol VARCHAR(20) NOT NULL,
       open_price NUMERIC NOT NULL,
@@ -26,18 +26,31 @@ async function initDB() {
       high_price NUMERIC NOT NULL,
       low_price NUMERIC NOT NULL,
       avg_price NUMERIC NOT NULL,
+      total_volume NUMERIC,
+      volatility NUMERIC,
       bucket_start TIMESTAMP WITH TIME ZONE NOT NULL,
       bucket_end TIMESTAMP WITH TIME ZONE NOT NULL,
       UNIQUE (symbol, bucket_start)
-    );
-    CREATE INDEX IF NOT EXISTS idx_summary_symbol_bucket ON summary_prices(symbol, bucket_start DESC);
-  `;
-  try {
-    await pool.query(queries);
-    console.log('Database initialized: prices and summary_prices tables ready.');
-  } catch (error) {
-    console.error('Error initializing database:', error);
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_summary_symbol_bucket ON summary_prices(symbol, bucket_start DESC)`,
+    `CREATE TABLE IF NOT EXISTS tracked_symbols (
+      id SERIAL PRIMARY KEY,
+      symbols TEXT[] NOT NULL,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `ALTER TABLE prices ADD COLUMN IF NOT EXISTS volume NUMERIC`,
+    `ALTER TABLE summary_prices ADD COLUMN IF NOT EXISTS total_volume NUMERIC`,
+    `ALTER TABLE summary_prices ADD COLUMN IF NOT EXISTS volatility NUMERIC`
+  ];
+
+  for (const q of queries) {
+    try {
+      await pool.query(q);
+    } catch (err) {
+      console.warn(`Migration step failed: ${q.substring(0, 30)}... - ${err.message}`);
+    }
   }
+  console.log('Database initialization check complete.');
 }
 
 async function downsampleAndCleanup() {
@@ -45,10 +58,10 @@ async function downsampleAndCleanup() {
   try {
     await client.query('BEGIN');
 
-    const cutoff = `NOW() - INTERVAL '${SUMMARY_AGE_HOURS} hours'`;
+    const cutoff = `(CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '${SUMMARY_AGE_HOURS} hours'`;
 
     await client.query(`
-      INSERT INTO summary_prices (symbol, open_price, close_price, high_price, low_price, avg_price, bucket_start, bucket_end)
+      INSERT INTO summary_prices (symbol, open_price, close_price, high_price, low_price, avg_price, total_volume, volatility, bucket_start, bucket_end)
       SELECT
         symbol,
         (ARRAY_AGG(price ORDER BY timestamp ASC))[1] AS open_price,
@@ -56,11 +69,13 @@ async function downsampleAndCleanup() {
         MAX(price) AS high_price,
         MIN(price) AS low_price,
         AVG(price) AS avg_price,
-        DATE_TRUNC('minute', MIN(timestamp)) AS bucket_start,
-        DATE_TRUNC('minute', MAX(timestamp)) AS bucket_end
+        SUM(COALESCE(volume, 0)) AS total_volume,
+        STDDEV(price) AS volatility,
+        DATE_TRUNC('minute', MIN(timestamp) AT TIME ZONE 'UTC') AS bucket_start,
+        DATE_TRUNC('minute', MAX(timestamp) AT TIME ZONE 'UTC') AS bucket_end
       FROM prices
       WHERE timestamp < ${cutoff}
-      GROUP BY symbol, DATE_TRUNC('minute', timestamp)
+      GROUP BY symbol, DATE_TRUNC('minute', timestamp AT TIME ZONE 'UTC')
       ON CONFLICT DO NOTHING
     `);
 
@@ -69,7 +84,7 @@ async function downsampleAndCleanup() {
     `);
 
     const expired = await client.query(`
-      DELETE FROM summary_prices WHERE bucket_start < NOW() - INTERVAL '${SUMMARY_RETENTION_DAYS} days'
+      DELETE FROM summary_prices WHERE bucket_start < (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '${SUMMARY_RETENTION_DAYS} days'
     `);
 
     await client.query('COMMIT');

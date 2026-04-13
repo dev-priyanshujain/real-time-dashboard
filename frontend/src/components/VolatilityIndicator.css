@@ -1,0 +1,55 @@
+.volatility-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+}
+
+.vol-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.vol-header .label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.vol-header .rating {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.vol-value {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.val-text {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.vol-track {
+  height: 6px;
+  background: var(--bg-main);
+  border-radius: 100px;
+  overflow: hidden;
+}
+
+.vol-fill {
+  height: 100%;
+  border-radius: 100px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}

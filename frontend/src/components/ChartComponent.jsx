@@ -1,16 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend,
   Filler
 } from 'chart.js';
-import { Line } from 'react-chartjs-2';
+import { Chart } from 'react-chartjs-2';
+import { useAnalyticsData } from "../hooks/useAnalyticsData";
 import './ChartComponent.css';
 
 ChartJS.register(
@@ -18,6 +20,7 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend,
@@ -35,27 +38,38 @@ const RANGES = [
 const MAX_LIVE_POINTS = 60;
 
 const formatTickLabel = (timestamp, range) => {
+  if (!timestamp) return "";
   const d = new Date(timestamp);
+  if (isNaN(d.getTime())) return "";
+  
   switch (range) {
     case '1h':
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     case '6h':
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     case '1d':
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' });
     case '7d':
-      return d.toLocaleDateString([], { weekday: 'short', hour: '2-digit' });
+      return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
     case '30d':
-      return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      return d.toLocaleDateString([], { month: 'short', day: 'numeric', timeZone: 'UTC' });
     default:
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' });
   }
+};
+
+const formatVolume = (vol) => {
+  if (!vol) return "0";
+  const num = parseFloat(vol);
+  if (num >= 1e9) return (num / 1e9).toFixed(2) + "B";
+  if (num >= 1e6) return (num / 1e6).toFixed(2) + "M";
+  if (num >= 1e3) return (num / 1e3).toFixed(2) + "K";
+  return num.toFixed(0);
 };
 
 const ChartComponent = ({ symbol, livePrice }) => {
   const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState('1d');
+  const { volumeData } = useAnalyticsData(symbol, range);
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -64,7 +78,7 @@ const ChartComponent = ({ symbol, livePrice }) => {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const res = await fetch(`${apiUrl}/history?symbol=${symbol}&range=${range}`);
         const data = await res.json();
-        setHistoryData(data);
+        setHistoryData(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error('Error fetching history:', err);
       } finally {
@@ -74,40 +88,92 @@ const ChartComponent = ({ symbol, livePrice }) => {
     fetchHistory();
   }, [symbol, range]);
 
-  const displayData = Array.isArray(historyData) ? [...historyData] : [];
-  if (livePrice && livePrice.price !== null && displayData.length > 0) {
-     const lastData = displayData[displayData.length - 1];
-     if (new Date(livePrice.timestamp) > new Date(lastData.timestamp)) {
-         displayData.push({ price: livePrice.price, timestamp: livePrice.timestamp });
-         if (displayData.length > MAX_LIVE_POINTS) {
-           const cutoff = displayData.length - MAX_LIVE_POINTS;
-           displayData.splice(0, cutoff);
-         }
-     }
-  }
+  // Round timestamp to nearest minute boundary for reliable matching
+  const roundToMinute = (ts) => {
+    const d = new Date(ts);
+    d.setSeconds(0, 0);
+    return d.getTime();
+  };
+
+  const displayData = useMemo(() => {
+    const base = Array.isArray(historyData) ? [...historyData] : [];
+    
+    if (livePrice && livePrice.price !== null) {
+      const lastData = base.length > 0 ? base[base.length - 1] : null;
+      if (!lastData || new Date(livePrice.timestamp) > new Date(lastData.timestamp)) {
+        base.push({
+          price: livePrice.price,
+          volume: livePrice.volume,
+          timestamp: livePrice.timestamp,
+        });
+        if (base.length > MAX_LIVE_POINTS) {
+          base.splice(0, base.length - MAX_LIVE_POINTS);
+        }
+      }
+    }
+    return base;
+  }, [historyData, livePrice]);
+
+  const mergedData = useMemo(() => {
+    const volumeMap = new Map(
+      Array.isArray(volumeData) ? volumeData.map((v) => [
+        roundToMinute(v.timestamp),
+        parseFloat(v.volume) || 0,
+      ]) : []
+    );
+
+    return displayData.map((d, i) => {
+      const prev = i > 0 ? displayData[i - 1] : null;
+      const isUp = prev ? parseFloat(d.price) >= parseFloat(prev.price) : true;
+      
+      return {
+        ...d,
+        isUp,
+        mergedVolume:
+          volumeMap.get(roundToMinute(d.timestamp)) ||
+          parseFloat(d.volume) ||
+          0,
+      };
+    });
+  }, [displayData, volumeData]);
 
   const chartData = {
-    labels: displayData.map(d => formatTickLabel(d.timestamp, range)),
+    labels: mergedData.map(d => formatTickLabel(d.timestamp, range)),
     datasets: [
       {
+        type: 'line',
         label: `${symbol.replace('USDT', '')} Price`,
-        data: displayData.map(d => parseFloat(d.price) || 0),
-        borderColor: '#111827',
+        data: mergedData.map(d => parseFloat(d.price) || 0),
+        borderColor: '#6366f1',
         backgroundColor: (context) => {
-          const ctx = context.chart.ctx;
-          const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-          gradient.addColorStop(0, 'rgba(17, 24, 39, 0.08)');
-          gradient.addColorStop(1, 'rgba(17, 24, 39, 0.0)');
+          const chart = context.chart;
+          const { ctx, chartArea } = chart;
+          if (!chartArea || !ctx) return 'rgba(99, 102, 241, 0.1)';
+          const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          gradient.addColorStop(0, 'rgba(99, 102, 241, 0.15)');
+          gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
           return gradient;
         },
-        borderWidth: 1.5,
-        tension: 0.15,
+        borderWidth: 2.5,
+        tension: 0.1,
         fill: true,
         pointRadius: 0,
-        pointHoverRadius: 4,
-        pointBackgroundColor: '#ffffff',
-        pointBorderColor: '#111827',
-        pointBorderWidth: 1.5,
+        pointHoverRadius: 6,
+        pointBackgroundColor: '#6366f1',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        yAxisID: 'y',
+        order: 1,
+      },
+      {
+        type: 'bar',
+        label: 'Volume',
+        data: mergedData.map(d => d.mergedVolume || 0),
+        backgroundColor: mergedData.map(d => d.isUp ? 'rgba(16, 185, 129, 0.2)' : 'rgba(244, 63, 94, 0.2)'),
+        borderColor: mergedData.map(d => d.isUp ? 'rgba(16, 185, 129, 0.4)' : 'rgba(244, 63, 94, 0.4)'),
+        borderWidth: 1,
+        yAxisID: 'y1',
+        order: 2,
       }
     ]
   };
@@ -120,40 +186,55 @@ const ChartComponent = ({ symbol, livePrice }) => {
       tooltip: {
         mode: 'index',
         intersect: false,
-        backgroundColor: '#111827',
-        titleColor: '#9ca3af',
+        backgroundColor: '#1e293b',
+        titleColor: '#94a3b8',
         bodyColor: '#ffffff',
-        borderColor: '#374151',
-        borderWidth: 0,
-        padding: 10,
-        displayColors: false,
-        cornerRadius: 4,
-        titleFont: { family: 'Inter', size: 11 },
-        bodyFont: { family: 'Inter', size: 12, weight: '600' }
+        padding: 12,
+        cornerRadius: 8,
+        titleFont: { family: 'Outfit', size: 12 },
+        bodyFont: { family: 'JetBrains Mono', size: 12, weight: '600' },
+        callbacks: {
+          label: function (context) {
+            if (context.dataset.yAxisID === "y1") {
+              return "Volume: " + formatVolume(context.parsed.y);
+            }
+            return "Price: $" + context.parsed.y.toLocaleString(undefined, { maximumFractionDigits: 2 });
+          },
+        },
       },
     },
     scales: {
       x: { 
         display: true, 
-        grid: { display: false },
+        grid: { color: 'rgba(226, 232, 240, 0.4)', borderDash: [5, 5] },
         border: { display: false },
-        ticks: { color: '#9ca3af', maxTicksLimit: 6, font: { family: 'Inter', size: 10 } }
+        ticks: { color: '#94a3b8', maxTicksLimit: 7, font: { family: 'Outfit', size: 10 } }
       },
       y: { 
-        display: true, 
-        grid: { color: '#f3f4f6', drawBorder: false },
+        position: 'right',
+        grid: { color: 'rgba(226, 232, 240, 0.4)', borderDash: [5, 5] },
         border: { display: false },
-        ticks: { color: '#9ca3af', font: { family: 'Inter', size: 10 } }
+        ticks: { 
+          color: '#64748b', 
+          font: { family: 'JetBrains Mono', size: 10 },
+          callback: (val) => '$' + val.toLocaleString()
+        },
+        // IMPORTANT: Let chart focus on price range
+        beginAtZero: false 
+      },
+      y1: {
+        display: false,
+        min: 0,
+        max: (() => {
+          if (mergedData.length === 0) return 1000;
+          const vols = mergedData.map(d => d.mergedVolume || 0);
+          const maxVol = Math.max(...vols, 0);
+          return maxVol > 0 ? maxVol * 3.33 : 1000;
+        })(),
       }
     },
-    animation: {
-      duration: 0
-    },
-    interaction: {
-      mode: 'nearest',
-      axis: 'x',
-      intersect: false
-    }
+    animation: { duration: 0 },
+    interaction: { mode: 'nearest', axis: 'x', intersect: false }
   };
 
   return (
@@ -178,7 +259,7 @@ const ChartComponent = ({ symbol, livePrice }) => {
              <div className="spinner"></div>
           </div>
         ) : (
-          <Line data={chartData} options={options} />
+          <Chart type="bar" data={chartData} options={options} />
         )}
       </div>
     </div>

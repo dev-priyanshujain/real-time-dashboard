@@ -60,15 +60,43 @@ async function fetchTop100Symbols() {
     
     top100Symbols = new Set(symbols);
     
+    // Save successful fetch to DB cache
+    try {
+      await query("DELETE FROM tracked_symbols");
+      await query("INSERT INTO tracked_symbols (symbols) VALUES ($1)", [symbols]);
+    } catch (saveErr) {
+      console.warn("Failed to cache symbols to DB:", saveErr.message);
+    }
+
     // Pre-populate latestPrices so frontend knows immediately
     top100Symbols.forEach(sym => {
       if (!latestPrices[sym]) {
-        latestPrices[sym] = { symbol: sym, price: null, timestamp: new Date() };
+        latestPrices[sym] = { symbol: sym, price: null, volume: 0, timestamp: new Date().toISOString() };
       }
     });
 
     console.log(`Tracking top ${top100Symbols.size} USDT symbols by Market Cap.`);
   } catch (err) {
+    console.warn("External coin list fetch failed. Attempting to load from DB cache...");
+
+    try {
+      const cached = await query("SELECT symbols FROM tracked_symbols ORDER BY updated_at DESC LIMIT 1");
+      if (cached.rows.length > 0) {
+        const symbols = cached.rows[0].symbols;
+        top100Symbols = new Set(symbols);
+        symbols.forEach(sym => {
+          if (!latestPrices[sym]) {
+            latestPrices[sym] = { symbol: sym, price: null, volume: 0, timestamp: new Date().toISOString() };
+          }
+        });
+        console.log(`Loaded ${top100Symbols.size} symbols from DB cache.`);
+        setTimeout(fetchTop100Symbols, 30 * 60 * 1000); // Retry in 30m
+        return;
+      }
+    } catch (dbErr) {
+      console.error("DB cache load failed:", dbErr.message);
+    }
+
     console.error('Error fetching coin lists, fallback to hardcoded top 100.', err.message);
     const defaults = [
       'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT', 'AVAXUSDT', 'DOGEUSDT', 'DOTUSDT', 'TRXUSDT',
@@ -84,7 +112,7 @@ async function fetchTop100Symbols() {
     ];
     top100Symbols = new Set(defaults);
     defaults.forEach(sym => {
-      latestPrices[sym] = { symbol: sym, price: null, timestamp: new Date() };
+      latestPrices[sym] = { symbol: sym, price: null, volume: 0, timestamp: new Date().toISOString() };
     });
   }
 }
@@ -114,7 +142,8 @@ async function connectBinanceWS() {
             const newEntry = {
               symbol,
               price: parseFloat(ticker.c),
-              timestamp: new Date()
+              volume: parseFloat(ticker.q) || 0, // 24h rolling quote asset volume
+              timestamp: new Date().toISOString()
             };
             latestPrices[symbol] = newEntry;
             chunkUpdates[symbol] = newEntry;
@@ -160,15 +189,19 @@ setInterval(async () => {
     let counter = 1;
 
     for (const p of batch) {
-      values.push(`($${counter}, $${counter + 1}, $${counter + 2})`);
-      queryParams.push(p.symbol, p.price, p.timestamp);
-      counter += 3;
+      values.push(`($${counter}, $${counter + 1}, $${counter + 2}, $${counter + 3})`);
+      queryParams.push(p.symbol, p.price, p.volume || 0, p.timestamp);
+      counter += 4;
     }
 
     const insertQuery = `
-      INSERT INTO prices (symbol, price, timestamp) 
+      INSERT INTO prices (symbol, price, volume, timestamp) 
       VALUES ${values.join(', ')}
     `;
+
+    if (batch.length > 0) {
+      console.log(`[DB] Batch Insert: ${batch.length} rows. Sample: ${batch[0].symbol} Vol: ${batch[0].volume}`);
+    }
 
     await query(insertQuery, queryParams);
   } catch (err) {
