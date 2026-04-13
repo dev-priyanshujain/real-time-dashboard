@@ -7,6 +7,8 @@ const PriceTable = ({ prices, selectedSymbol, onSelectSymbol }) => {
   const symbols = useMemo(() => {
     const allSymbols = Object.keys(prices);
     let filtered = allSymbols;
+
+    
     
     if (searchTerm) {
       filtered = allSymbols.filter(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
