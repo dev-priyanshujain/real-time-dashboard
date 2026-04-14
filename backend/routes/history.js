@@ -22,23 +22,30 @@ router.get('/', async (req, res) => {
 
   try {
     const dbRes = await query(
-      `(
-        SELECT avg_price AS price, total_volume AS volume, bucket_end AS timestamp
-        FROM summary_prices
-        WHERE symbol = $1
-          AND bucket_start >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '${cfg.interval}'
-        ORDER BY bucket_end ASC
-      )
-      UNION ALL
-      (
-        SELECT price, volume, timestamp
-        FROM prices
-        WHERE symbol = $1
-          AND timestamp >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '${cfg.interval}'
-        ORDER BY timestamp ASC
-      )
-      ORDER BY timestamp ASC
-      LIMIT $2`,
+      `SELECT price, volume, timestamp FROM (
+        SELECT price, volume, timestamp FROM (
+          (
+            SELECT avg_price AS price, total_volume AS volume, bucket_end AS timestamp
+            FROM summary_prices
+            WHERE symbol = $1
+              AND bucket_start >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '${cfg.interval}'
+            ORDER BY bucket_end DESC
+            LIMIT $2
+          )
+          UNION ALL
+          (
+            SELECT price, volume, timestamp
+            FROM prices
+            WHERE symbol = $1
+              AND timestamp >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '${cfg.interval}'
+            ORDER BY timestamp DESC
+            LIMIT $2
+          )
+        ) AS combined
+        ORDER BY timestamp DESC
+        LIMIT $2
+      ) AS latest
+      ORDER BY timestamp ASC`,
       [symbol.toUpperCase(), cfg.limit]
     );
 

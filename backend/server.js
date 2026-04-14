@@ -29,7 +29,14 @@ async function startServer() {
     await initDB();
     startCleanupJob();
     connectBinanceWS();
-    setupWebSocketServer(server);
+    const wss = setupWebSocketServer();
+
+    // Explicit upgrade handling for better reliability on proxies
+    server.on('upgrade', (request, socket, head) => {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    });
 
     server.listen(PORT, () => {
       console.log(`Backend server running on port ${PORT}`);

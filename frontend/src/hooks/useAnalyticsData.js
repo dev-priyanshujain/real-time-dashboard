@@ -14,8 +14,17 @@ export const useAnalyticsData = (symbol, range) => {
             ? 'https://real-time-dashboard-1-hzy7.onrender.com' 
             : 'http://localhost:5000'
         );
-        const res = await fetch(`${apiUrl}/history?symbol=${symbol}&range=${range}`);
+        
+        const fetchUrl = `${apiUrl}/history?symbol=${symbol}&range=${range}`;
+        console.log(`[Analytics] Fetching: ${fetchUrl}`);
+        
+        const res = await fetch(fetchUrl);
+        if (!res.ok) {
+          throw new Error(`Server responded with ${res.status}: ${res.statusText}`);
+        }
+        
         const data = await res.json();
+        console.log(`[Analytics] Received ${Array.isArray(data) ? data.length : 'non-array'} data points`);
         
         if (Array.isArray(data)) {
           setHistoryData(data);
@@ -28,7 +37,7 @@ export const useAnalyticsData = (symbol, range) => {
           }
         }
       } catch (err) {
-        console.error('Error fetching analytics:', err);
+        console.error('[Analytics] Fetch failed:', err.message);
       } finally {
         setLoading(false);
       }

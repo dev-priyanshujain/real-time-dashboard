@@ -24,11 +24,14 @@ export function useCryptoData() {
           ? 'wss://real-time-dashboard-1-hzy7.onrender.com' 
           : 'ws://localhost:5000'
       );
+      
+      console.log(`[WebSocket] Connecting to: ${wsUrl}`);
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
         if (!active) { ws.close(); return; }
+        console.log('[WebSocket] Connection established');
         setIsConnected(true);
       };
 
@@ -39,18 +42,21 @@ export function useCryptoData() {
           if (msg.type === 'init' || msg.type === 'update') {
             setPrices(prev => ({ ...prev, ...msg.data }));
           }
-        } catch { /* malformed JSON, skip */ }
+        } catch (err) {
+          console.error('[WebSocket] Failed to parse message:', err);
+        }
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         if (!active) return;
+        console.warn(`[WebSocket] Connection closed (code: ${event.code}, reason: ${event.reason || 'none'})`);
         setIsConnected(false);
         wsRef.current = null;
         reconnectRef.current = setTimeout(connect, 3000);
       };
 
-      ws.onerror = () => {
-        // onerror always fires before onclose, so just let onclose handle cleanup
+      ws.onerror = (err) => {
+        console.error('[WebSocket] Connection error:', err);
       };
     };
 
