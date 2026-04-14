@@ -69,7 +69,7 @@ async function downsampleAndCleanup() {
         MAX(price) AS high_price,
         MIN(price) AS low_price,
         AVG(price) AS avg_price,
-        SUM(COALESCE(volume, 0)) AS total_volume,
+        MAX(volume) AS total_volume,
         STDDEV(price) AS volatility,
         DATE_TRUNC('minute', MIN(timestamp) AT TIME ZONE 'UTC') AS bucket_start,
         DATE_TRUNC('minute', MAX(timestamp) AT TIME ZONE 'UTC') AS bucket_end

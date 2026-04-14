@@ -21,33 +21,36 @@ router.get('/', async (req, res) => {
   const cfg = VALID_RANGES[range] || VALID_RANGES['1d'];
 
   try {
-    const dbRes = await query(
-      `SELECT price, volume, timestamp FROM (
+    let sql;
+    if (range === '1h') {
+      // High-resolution view for 1 hour
+      sql = `
         SELECT price, volume, timestamp FROM (
-          (
-            SELECT avg_price AS price, total_volume AS volume, bucket_end AS timestamp
-            FROM summary_prices
-            WHERE symbol = $1
-              AND bucket_start >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '${cfg.interval}'
-            ORDER BY bucket_end DESC
-            LIMIT $2
-          )
-          UNION ALL
-          (
-            SELECT price, volume, timestamp
-            FROM prices
-            WHERE symbol = $1
-              AND timestamp >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '${cfg.interval}'
-            ORDER BY timestamp DESC
-            LIMIT $2
-          )
-        ) AS combined
-        ORDER BY timestamp DESC
-        LIMIT $2
-      ) AS latest
-      ORDER BY timestamp ASC`,
-      [symbol.toUpperCase(), cfg.limit]
-    );
+          SELECT price, volume, timestamp 
+          FROM prices 
+          WHERE symbol = $1 
+            AND timestamp >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '1 hour'
+          ORDER BY timestamp DESC
+          LIMIT $2
+        ) AS latest
+        ORDER BY timestamp ASC
+      `;
+    } else {
+      // Consistent 1-minute resolution for longer ranges
+      sql = `
+        SELECT price, volume, timestamp FROM (
+          SELECT avg_price AS price, total_volume AS volume, bucket_end AS timestamp
+          FROM summary_prices
+          WHERE symbol = $1
+            AND bucket_start >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '${cfg.interval}'
+          ORDER BY bucket_end DESC
+          LIMIT $2
+        ) AS latest
+        ORDER BY timestamp ASC
+      `;
+    }
+
+    const dbRes = await query(sql, [symbol.toUpperCase(), cfg.limit]);
 
     res.json(dbRes.rows);
   } catch (err) {
