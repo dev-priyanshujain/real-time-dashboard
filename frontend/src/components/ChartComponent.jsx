@@ -38,7 +38,7 @@ const RANGES = [
   { key: '30d', label: '30D' },
 ];
 
-const MAX_LIVE_POINTS = 60;
+const MAX_LIVE_POINTS = 1000;
 
 const formatTickLabel = (timestamp, range) => {
   if (!timestamp) return "";
@@ -47,6 +47,7 @@ const formatTickLabel = (timestamp, range) => {
   
   switch (range) {
     case '1h':
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'UTC' });
     case '6h':
     case '1d':
       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' });

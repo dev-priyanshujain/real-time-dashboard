@@ -3,11 +3,11 @@ const router = express.Router();
 const { query } = require('../db');
 
 const VALID_RANGES = {
-  '1h':  { interval: '1 hour',    limit: 60   },
-  '6h':  { interval: '6 hours',   limit: 360  },
-  '1d':  { interval: '1 day',     limit: 1440 },
-  '7d':  { interval: '7 days',    limit: 10080 },
-  '30d': { interval: '30 days',   limit: 30240 },
+  '1h':  { interval: '1 hour',    limit: 1000 },
+  '6h':  { interval: '6 hours',   limit: 2000 },
+  '1d':  { interval: '1 day',     limit: 2000 },
+  '7d':  { interval: '7 days',    limit: 5000 },
+  '30d': { interval: '30 days',   limit: 10000 },
 };
 
 // GET /history?symbol=BTCUSDT&range=1d
