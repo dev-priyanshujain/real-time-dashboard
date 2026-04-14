@@ -19,7 +19,7 @@ function App() {
       <header className="header">
         <div className="header-content">
           <div className="logo-section">
-            <h1 className="logo">Antigravity</h1>
+            <h1 className="logo">Ledger</h1>
             <span className="logo-badge">Pro</span>
           </div>
           <div className="status-badge">
