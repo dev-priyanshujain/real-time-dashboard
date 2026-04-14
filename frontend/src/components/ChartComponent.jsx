@@ -38,7 +38,7 @@ const RANGES = [
   { key: '30d', label: '30D' },
 ];
 
-const MAX_LIVE_POINTS = 1000;
+const MAX_LIVE_POINTS = 50000;
 
 const formatTickLabel = (timestamp, range) => {
   if (!timestamp) return "";
