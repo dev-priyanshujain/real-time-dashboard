@@ -7,7 +7,11 @@ export const useAnalyticsData = (symbol, range) => {
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const apiUrl = import.meta.env.VITE_API_URL || (
+          window.location.hostname !== 'localhost' 
+            ? 'https://real-time-dashboard-1-hzy7.onrender.com' 
+            : 'http://localhost:5000'
+        );
         // Note: We use the history endpoint but extract volume/volatility from the rich response
         // In the current backend, volume is part of the history response
         const res = await fetch(`${apiUrl}/history?symbol=${symbol}&range=${range}`);

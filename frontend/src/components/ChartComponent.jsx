@@ -79,7 +79,11 @@ const ChartComponent = ({ symbol, livePrice }) => {
     const fetchHistory = async () => {
       setLoading(true);
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const apiUrl = import.meta.env.VITE_API_URL || (
+          window.location.hostname !== 'localhost' 
+            ? 'https://real-time-dashboard-1-hzy7.onrender.com' 
+            : 'http://localhost:5000'
+        );
         const res = await fetch(`${apiUrl}/history?symbol=${symbol}&range=${range}`);
         const data = await res.json();
         setHistoryData(Array.isArray(data) ? data : []);

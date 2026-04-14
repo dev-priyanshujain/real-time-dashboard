@@ -19,7 +19,11 @@ export function useCryptoData() {
         }
       }
 
-      const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:5000';
+      const wsUrl = import.meta.env.VITE_WS_URL || (
+        window.location.hostname !== 'localhost' 
+          ? 'wss://real-time-dashboard-1-hzy7.onrender.com' 
+          : 'ws://localhost:5000'
+      );
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
