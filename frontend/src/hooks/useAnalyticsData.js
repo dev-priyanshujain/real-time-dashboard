@@ -2,26 +2,24 @@ import { useState, useEffect } from 'react';
 
 export const useAnalyticsData = (symbol, range) => {
   const [volatility, setVolatility] = useState(null);
-  const [volumeData, setVolumeData] = useState([]);
+  const [historyData, setHistoryData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchAnalytics = async () => {
+      setLoading(true);
       try {
         const apiUrl = import.meta.env.VITE_API_URL || (
           window.location.hostname !== 'localhost' 
             ? 'https://real-time-dashboard-1-hzy7.onrender.com' 
             : 'http://localhost:5000'
         );
-        // Note: We use the history endpoint but extract volume/volatility from the rich response
-        // In the current backend, volume is part of the history response
         const res = await fetch(`${apiUrl}/history?symbol=${symbol}&range=${range}`);
         const data = await res.json();
         
         if (Array.isArray(data)) {
-          setVolumeData(data);
+          setHistoryData(data);
           
-          // Simple volatility calculation if not provided by backend: 
-          // (StdDev of prices / Mean price)
           if (data.length > 1) {
             const prices = data.map(d => parseFloat(d.price));
             const mean = prices.reduce((a, b) => a + b, 0) / prices.length;
@@ -31,6 +29,8 @@ export const useAnalyticsData = (symbol, range) => {
         }
       } catch (err) {
         console.error('Error fetching analytics:', err);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -39,5 +39,5 @@ export const useAnalyticsData = (symbol, range) => {
     }
   }, [symbol, range]);
 
-  return { volatility, volumeData };
+  return { volatility, historyData, loading };
 };

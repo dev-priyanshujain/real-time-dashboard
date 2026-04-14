@@ -9,9 +9,10 @@ import './index.css';
 function App() {
   const { prices, isConnected } = useCryptoData();
   const [selectedSymbol, setSelectedSymbol] = useState('BTCUSDT');
+  const [range, setRange] = useState('1d');
   
   const currentSymbolData = useMemo(() => prices[selectedSymbol] || {}, [prices, selectedSymbol]);
-  const { volatility } = useAnalyticsData(selectedSymbol, '1d');
+  const { volatility, historyData, loading } = useAnalyticsData(selectedSymbol, range);
 
   return (
     <div className="app-container">
@@ -63,7 +64,14 @@ function App() {
           </div>
 
           <div className="chart-wrapper-main">
-            <ChartComponent symbol={selectedSymbol} livePrice={currentSymbolData} />
+            <ChartComponent 
+              symbol={selectedSymbol} 
+              livePrice={currentSymbolData}
+              historyData={historyData}
+              loading={loading}
+              range={range}
+              setRange={setRange} 
+            />
           </div>
         </section>
       </main>

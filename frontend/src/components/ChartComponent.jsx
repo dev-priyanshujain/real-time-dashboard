@@ -12,7 +12,6 @@ import {
   Filler
 } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
-import { useAnalyticsData } from "../hooks/useAnalyticsData";
 import './ChartComponent.css';
 
 
@@ -69,33 +68,7 @@ const formatVolume = (vol) => {
   return num.toFixed(0);
 };
 
-const ChartComponent = ({ symbol, livePrice }) => {
-  const [historyData, setHistoryData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState('1d');
-  const { volumeData } = useAnalyticsData(symbol, range);
-
-  useEffect(() => {
-    const fetchHistory = async () => {
-      setLoading(true);
-      try {
-        const apiUrl = import.meta.env.VITE_API_URL || (
-          window.location.hostname !== 'localhost' 
-            ? 'https://real-time-dashboard-1-hzy7.onrender.com' 
-            : 'http://localhost:5000'
-        );
-        const res = await fetch(`${apiUrl}/history?symbol=${symbol}&range=${range}`);
-        const data = await res.json();
-        setHistoryData(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error('Error fetching history:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchHistory();
-  }, [symbol, range]);
-
+const ChartComponent = ({ symbol, livePrice, historyData, loading, range, setRange }) => {
   // Round timestamp to nearest minute boundary for reliable matching
   const roundToMinute = (ts) => {
     const d = new Date(ts);
@@ -124,7 +97,7 @@ const ChartComponent = ({ symbol, livePrice }) => {
 
   const mergedData = useMemo(() => {
     const volumeMap = new Map(
-      Array.isArray(volumeData) ? volumeData.map((v) => [
+      Array.isArray(historyData) ? historyData.map((v) => [
         roundToMinute(v.timestamp),
         parseFloat(v.volume) || 0,
       ]) : []
@@ -143,7 +116,7 @@ const ChartComponent = ({ symbol, livePrice }) => {
           0,
       };
     });
-  }, [displayData, volumeData]);
+  }, [displayData, historyData]);
 
   const chartData = {
     labels: mergedData.map(d => formatTickLabel(d.timestamp, range)),
